@@ -1,4 +1,4 @@
-# FastAPI Chatbot Service
+# ASK-AI Chatbot Service
 
 ## Setup
 ```bash
