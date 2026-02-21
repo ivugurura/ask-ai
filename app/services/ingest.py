@@ -23,7 +23,6 @@ def chunk_text(text, chunk_size=350, overlap=60):
 
 def ingest_unindexed_topics():
     conn = get_conn()
-    conn.autocommit = False
 
     with conn.cursor() as cur:
         cur.execute("""
@@ -43,11 +42,11 @@ def ingest_unindexed_topics():
         embeddings = model.encode(chunks).tolist()
 
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM topic_chunks WHERE topicId = %s", (topic_id,))
+            cur.execute("""DELETE FROM topic_chunks WHERE "topicId" = %s""", (topic_id,))
 
             cur.executemany("""
                 INSERT INTO topic_chunks
-                  (topicId, slug, languageId, chunkIndex, text, embedding, "createdAt", "updatedAt")
+                  ("topicId", slug, "languageId", "chunkIndex", text, embedding, "createdAt", "updatedAt")
                 VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
             """, [
                 (topic_id, slug, language_id, idx, chunk, emb)
