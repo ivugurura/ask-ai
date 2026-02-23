@@ -1,11 +1,12 @@
 from sentence_transformers import SentenceTransformer
+from pgvector import Vector
 from app.db import get_conn
 from app.settings import EMBEDDING_MODEL, TOP_K
 
 model = SentenceTransformer(EMBEDDING_MODEL)
 
 def ask_question(question: str, language_id: int | None = None):
-    query_emb = model.encode([question])[0].tolist()
+    query_emb = Vector(model.encode([question])[0].tolist())
     conn = get_conn()
 
     with conn.cursor() as cur:
