@@ -1,9 +1,46 @@
 from sentence_transformers import SentenceTransformer
 from pgvector import Vector
+import requests
+
 from app.db import get_conn
-from app.settings import EMBEDDING_MODEL, TOP_K
+from app.settings import (
+    EMBEDDING_MODEL,
+    TOP_K,
+    OLLAMA_BASE_URL,
+    OLLAMA_MODEL,
+    SUMMARY_MAX_CHARS,
+    RELEVANCE_MAX_DISTANCE,
+)
 
 model = SentenceTransformer(EMBEDDING_MODEL)
+
+
+def _summarize_with_ollama(question: str, context: str) -> str:
+    if not context.strip():
+        return ""
+
+    prompt = (
+        "You are a helpful assistant. Summarize the content below in 5-7 sentences. "
+        "Focus on answering the question directly.\n\n"
+        f"Question: {question}\n\n"
+        f"Content:\n{context}\n"
+    )
+
+    try:
+        response = requests.post(
+            f"{OLLAMA_BASE_URL}/api/generate",
+            json={
+                "model": OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False,
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        return response.json().get("response", "").strip()
+    except requests.RequestException as e:
+        print(f"Error occurred while summarizing with Ollama: {e}")
+        return ""
 
 def ask_question(question: str, language_id: int | None = None):
     query_emb = Vector(model.encode([question])[0].tolist())
@@ -12,19 +49,19 @@ def ask_question(question: str, language_id: int | None = None):
     with conn.cursor() as cur:
         if language_id:
             cur.execute("""
-                SELECT tc.text, t.title, t.slug
+                SELECT tc.text, t.title, t.slug, tc.embedding <=> %s AS distance
                 FROM topic_chunks tc
                 JOIN topics t ON tc."topicId" = t.id
                 WHERE tc."languageId" = %s
-                ORDER BY tc.embedding <=> %s
+                ORDER BY distance
                 LIMIT %s
-            """, (language_id, query_emb, TOP_K))
+            """, (query_emb, language_id, TOP_K))
         else:
             cur.execute("""
-                SELECT tc.text, t.title, t.slug
+                SELECT tc.text, t.title, t.slug, tc.embedding <=> %s AS distance
                 FROM topic_chunks tc
                 JOIN topics t ON tc."topicId" = t.id
-                ORDER BY tc.embedding <=> %s
+                ORDER BY distance
                 LIMIT %s
             """, (query_emb, TOP_K))
 
@@ -32,7 +69,19 @@ def ask_question(question: str, language_id: int | None = None):
 
     conn.close()
 
+    filtered_rows = [r for r in rows if r[3] <= RELEVANCE_MAX_DISTANCE]
+    chunks = [r[0] for r in filtered_rows]
+    raw_context = "\n\n".join(chunks)
+    context = raw_context[:SUMMARY_MAX_CHARS]
+    summary = _summarize_with_ollama(question, context)
+
+    sources_by_slug = {}
+    print(summary)
+    for _text, title, slug, _distance in filtered_rows:
+        if slug not in sources_by_slug:
+            sources_by_slug[slug] = {"title": title, "slug": slug}
+
     return {
-        "answer": "\n\n".join([r[0] for r in rows]),
-        "sources": [{"title": r[1], "slug": r[2]} for r in rows],
+        "answer": summary or raw_context,
+        "sources": list(sources_by_slug.values()),
     }

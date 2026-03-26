@@ -14,6 +14,7 @@ pgvector = "*"
 sentence-transformers = "*"
 beautifulsoup4 = "*"
 python-dotenv = "*"
+requests = "*"
 
 [dev-packages]
 
