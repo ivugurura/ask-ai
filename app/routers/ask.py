@@ -8,5 +8,7 @@ router = APIRouter()
 def ask(payload: dict):
     question = payload.get("question", "")
     language_id = payload.get("languageId")
-    result = ask_question(question, language_id)
+    lang = payload.get("lang", "en")
+
+    result = ask_question(question, language_id, lang)
     return server_response(200, data=result, message="Question answered")
