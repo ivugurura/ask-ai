@@ -5,6 +5,7 @@ name = "pypi"
 
 [scripts]
 start = "uvicorn app.main:app --reload"
+test = "pytest"
 
 [packages]
 fastapi = "==0.135.3"
