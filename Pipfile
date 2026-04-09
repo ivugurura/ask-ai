@@ -7,16 +7,18 @@ name = "pypi"
 start = "uvicorn app.main:app --reload"
 
 [packages]
-fastapi = "*"
-uvicorn = "*"
-psycopg2 = "*"
-pgvector = "*"
-sentence-transformers = "*"
-beautifulsoup4 = "*"
-python-dotenv = "*"
-requests = "*"
+fastapi = "==0.135.3"
+uvicorn = "==0.44.0"
+psycopg2 = "==2.9.11"
+pgvector = "==0.4.2"
+sentence-transformers = "==5.4.0"
+beautifulsoup4 = "==4.14.3"
+python-dotenv = "==1.2.2"
+requests = "==2.33.1"
 
 [dev-packages]
+ruff = "==0.15.10"
+pytest = "==9.0.3"
 
 [requires]
 python_version = "3.10"
