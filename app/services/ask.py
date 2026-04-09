@@ -117,7 +117,6 @@ def ask_question(
     summary = _summarize_with_ollama(question, context, lan)
 
     sources_by_slug = {}
-    print(summary)
     for _text, title, slug, _distance in filtered_rows:
         if slug not in sources_by_slug:
             sources_by_slug[slug] = {"title": title, "slug": slug}
