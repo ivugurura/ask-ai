@@ -1,9 +1,18 @@
 from bs4 import BeautifulSoup
-from sentence_transformers import SentenceTransformer
 from app.db import get_conn
 from app.settings import EMBEDDING_MODEL
 
-model = SentenceTransformer(EMBEDDING_MODEL)
+_model = None
+
+
+def _get_model():
+    global _model
+    if _model is None:
+        # Delay heavy ML imports so app startup and CI smoke tests do not require GPU libs.
+        from sentence_transformers import SentenceTransformer
+
+        _model = SentenceTransformer(EMBEDDING_MODEL)
+    return _model
 
 def html_to_text(html: str) -> str:
     soup = BeautifulSoup(html or "", "html.parser")
@@ -22,6 +31,7 @@ def chunk_text(text, chunk_size=350, overlap=60):
     return chunks
 
 def ingest_unindexed_topics():
+    model = _get_model()
     conn = get_conn()
 
     with conn.cursor() as cur:

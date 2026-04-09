@@ -1,4 +1,3 @@
-from sentence_transformers import SentenceTransformer
 from pgvector import Vector
 import requests
 
@@ -12,7 +11,17 @@ from app.settings import (
     RELEVANCE_MAX_DISTANCE,
 )
 
-model = SentenceTransformer(EMBEDDING_MODEL)
+_model = None
+
+
+def _get_model():
+    global _model
+    if _model is None:
+        # Delay heavy ML imports so app startup and CI smoke tests do not require GPU libs.
+        from sentence_transformers import SentenceTransformer
+
+        _model = SentenceTransformer(EMBEDDING_MODEL)
+    return _model
 
 PROMPT_BY_LANGUAGE = {
     "en": {
@@ -84,6 +93,7 @@ def ask_question(
     language_id: int | None = None,
     lan: str = "en",
 ):
+    model = _get_model()
     query_emb = Vector(model.encode([question])[0].tolist())
     conn = get_conn()
 
