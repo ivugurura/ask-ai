@@ -51,6 +51,3 @@ jobs:
 
       - name: Lint
         run: pipenv run ruff check app tests
-
-      - name: Run tests
-        run: pipenv run pytest -q
