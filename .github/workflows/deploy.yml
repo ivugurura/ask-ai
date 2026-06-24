@@ -81,8 +81,8 @@ jobs:
               .venv/bin/alembic upgrade head
             fi
 
-            sudo systemctl restart "$SERVICE_NAME"
-            sudo systemctl status "$SERVICE_NAME" --no-pager
+            sudo -n systemctl restart "$SERVICE_NAME"
+            sudo -n systemctl status "$SERVICE_NAME" --no-pager
 
       - name: Verify health check
         uses: appleboy/ssh-action@v1.2.0
