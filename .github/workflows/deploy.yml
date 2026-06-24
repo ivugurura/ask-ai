@@ -53,9 +53,9 @@ jobs:
             APP_ENV="${{ steps.vars.outputs.app_env }}"
 
             cd "$APP_DIR"
-            git fetch origin
             git checkout "$DEPLOY_BRANCH"
             git reset --hard "origin/$DEPLOY_BRANCH"
+            git pull origin "$DEPLOY_BRANCH"
 
             if [ ! -d .venv ]; then
               python3 -m venv .venv
