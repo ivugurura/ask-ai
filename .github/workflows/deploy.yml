@@ -81,6 +81,12 @@ jobs:
               .venv/bin/alembic upgrade head
             fi
 
+            if ! sudo -n true 2>/dev/null; then
+              echo "Passwordless sudo is not configured for this SSH user."
+              echo "Grant NOPASSWD for systemctl restart/status on $SERVICE_NAME in /etc/sudoers.d/."
+              exit 1
+            fi
+
             sudo -n systemctl restart "$SERVICE_NAME"
             sudo -n systemctl status "$SERVICE_NAME" --no-pager
 
