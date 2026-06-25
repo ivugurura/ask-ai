@@ -1,5 +1,6 @@
 from pgvector import Vector
 import requests
+from urllib.parse import urlparse, urlunparse
 
 from app.db import get_conn
 from app.settings import (
@@ -60,6 +61,52 @@ PROMPT_BY_LANGUAGE = {
 }
 
 
+def _candidate_ollama_base_urls(base_url: str) -> list[str]:
+    raw_base = (base_url or "http://localhost:11434").strip()
+    if not raw_base:
+        raw_base = "http://localhost:11434"
+
+    candidates = [raw_base.rstrip("/")]
+
+    # Some deployments expose OpenAI-compatible URLs ending in /v1 (or /api).
+    # Native Ollama endpoints live at the root, so we also try stripped variants.
+    for suffix in ("/v1", "/api"):
+        new_candidates = []
+        for candidate in candidates:
+            parsed = urlparse(candidate)
+            path = parsed.path.rstrip("/")
+            if path.endswith(suffix):
+                stripped_path = path[: -len(suffix)]
+                stripped_base = urlunparse(
+                    (
+                        parsed.scheme,
+                        parsed.netloc,
+                        stripped_path,
+                        "",
+                        "",
+                        "",
+                    )
+                ).rstrip("/")
+                if stripped_base and stripped_base not in candidates and stripped_base not in new_candidates:
+                    new_candidates.append(stripped_base)
+        candidates.extend(new_candidates)
+
+    return candidates
+
+
+def _extract_ollama_text(response_json: dict) -> str:
+    if "response" in response_json and isinstance(response_json["response"], str):
+        return response_json["response"].strip()
+
+    message = response_json.get("message")
+    if isinstance(message, dict):
+        content = message.get("content")
+        if isinstance(content, str):
+            return content.strip()
+
+    return ""
+
+
 def _summarize_with_ollama(question: str, context: str, lang: str = "en") -> str:
     if not context.strip():
         return ""
@@ -73,22 +120,58 @@ def _summarize_with_ollama(question: str, context: str, lang: str = "en") -> str
         f"{prompt_config['content_label']}:\n{context}\n"
     )
 
-    try:
-        response = requests.post(
-            f"{OLLAMA_BASE_URL}/api/generate",
-            json={
-                "model": OLLAMA_MODEL,
-                "prompt": prompt,
-                "stream": False,
-            },
-            timeout=30,
-        )
-        print(f"Ollama response status: {response.status_code}")
-        response.raise_for_status()
-        return response.json().get("response", "").strip()
-    except requests.RequestException as e:
-        print(f"Error occurred while summarizing with Ollama: {e}")
-        return ""
+    errors = []
+
+    for base_url in _candidate_ollama_base_urls(OLLAMA_BASE_URL):
+        generate_url = f"{base_url}/api/generate"
+        try:
+            response = requests.post(
+                generate_url,
+                json={
+                    "model": OLLAMA_MODEL,
+                    "prompt": prompt,
+                    "stream": False,
+                },
+                timeout=30,
+            )
+            if response.status_code != 404:
+                response.raise_for_status()
+                text = _extract_ollama_text(response.json())
+                if text:
+                    return text
+            else:
+                errors.append(f"{generate_url} returned 404")
+        except requests.RequestException as e:
+            errors.append(f"{generate_url} failed: {e}")
+
+        chat_url = f"{base_url}/api/chat"
+        try:
+            response = requests.post(
+                chat_url,
+                json={
+                    "model": OLLAMA_MODEL,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "stream": False,
+                },
+                timeout=30,
+            )
+            if response.status_code != 404:
+                response.raise_for_status()
+                text = _extract_ollama_text(response.json())
+                if text:
+                    return text
+            else:
+                errors.append(f"{chat_url} returned 404")
+        except requests.RequestException as e:
+            errors.append(f"{chat_url} failed: {e}")
+
+    print(
+        "Error occurred while summarizing with Ollama: "
+        f"could not get a valid response for model '{OLLAMA_MODEL}'. "
+        f"Tried base URL(s): {', '.join(_candidate_ollama_base_urls(OLLAMA_BASE_URL))}. "
+        f"Details: {' | '.join(errors) if errors else 'no response details'}"
+    )
+    return ""
 
 def ask_question(
     question: str,
