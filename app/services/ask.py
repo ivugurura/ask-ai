@@ -17,6 +17,7 @@ _model = None
 def _get_model():
     global _model
     if _model is None:
+        print("Loading embedding model...")
         # Delay heavy ML imports so app startup and CI smoke tests do not require GPU libs.
         from sentence_transformers import SentenceTransformer
 
@@ -82,6 +83,7 @@ def _summarize_with_ollama(question: str, context: str, lang: str = "en") -> str
             },
             timeout=30,
         )
+        print(f"Ollama response status: {response.status_code}")
         response.raise_for_status()
         return response.json().get("response", "").strip()
     except requests.RequestException as e:
