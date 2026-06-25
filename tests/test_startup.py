@@ -53,10 +53,11 @@ def test_health_check_endpoint() -> None:
         app_module = importlib.import_module("app.main")
 
         with TestClient(app_module.app) as client:
-            response = client.get("/health")
+            response = client.get("/ai/health")
 
     assert response.status_code == 200
     assert response.json() == {
         "success": True,
         "message": "Healthy",
+        'data': None
     }

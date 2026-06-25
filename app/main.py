@@ -16,10 +16,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_router, prefix="/ai/v1")
 
 
-@app.get("/health")
+@app.get("/ai/health")
 def health_check():
     return server_response(200, message="Healthy")
 
