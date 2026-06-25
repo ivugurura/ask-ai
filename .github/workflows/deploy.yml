@@ -45,12 +45,29 @@ jobs:
           port: ${{ secrets.SSH_PORT || '22' }}
           script_stop: true
           script: |
-            set -e
+            set -eu
 
             APP_DIR="${{ secrets.APP_DIR }}"
             SERVICE_NAME="${{ secrets.SERVICE_NAME }}"
             DEPLOY_BRANCH="${{ steps.vars.outputs.deploy_branch }}"
             APP_ENV="${{ steps.vars.outputs.app_env }}"
+
+            if [ -z "$SERVICE_NAME" ]; then
+              echo "SERVICE_NAME is empty. Check repository/environment secret configuration."
+              exit 1
+            fi
+
+            echo "SERVICE_NAME is set (value is masked if stored as a GitHub Secret)."
+
+            if ! systemctl list-unit-files --type=service --no-legend | awk '{print $1}' | grep -Fxq "$SERVICE_NAME"; then
+              if systemctl list-unit-files --type=service --no-legend | awk '{print $1}' | grep -Fxq "${SERVICE_NAME}.service"; then
+                SERVICE_NAME="${SERVICE_NAME}.service"
+                echo "Using unit with .service suffix."
+              else
+                echo "Systemd unit not found for SERVICE_NAME."
+                exit 1
+              fi
+            fi
 
             cd "$APP_DIR"
             git checkout "$DEPLOY_BRANCH"
@@ -80,9 +97,10 @@ jobs:
             if [ -f alembic.ini ]; then
               .venv/bin/alembic upgrade head
             fi
-            echo "Deployment to $SERVICE_NAME completed successfully."
+
             sudo -n systemctl restart "$SERVICE_NAME"
             sudo -n systemctl status "$SERVICE_NAME" --no-pager
+            echo "Deployment to $SERVICE_NAME completed successfully."
 
       - name: Verify health check
         uses: appleboy/ssh-action@v1.2.0
