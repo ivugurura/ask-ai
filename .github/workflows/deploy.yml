@@ -80,7 +80,7 @@ jobs:
             if [ -f alembic.ini ]; then
               .venv/bin/alembic upgrade head
             fi
-            whoami
+            echo "Deployment to $SERVICE_NAME completed successfully."
             sudo -n systemctl restart "$SERVICE_NAME"
             sudo -n systemctl status "$SERVICE_NAME" --no-pager
 
